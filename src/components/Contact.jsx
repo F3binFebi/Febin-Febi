@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { socialLinks, personalInfo } from '../data/portfolioData';
+import { socialLinks } from '../data/portfolioData';
 import { Mail, Send, Check, Copy, ArrowUpRight } from 'lucide-react';
 import { GithubIcon, LinkedinIcon, InstagramIcon, DiscordIcon } from './Icons';
 
@@ -31,22 +31,64 @@ export default function Contact({ onShowToast }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      onShowToast('Please fill out all required fields.');
+
+    const name = formData.name.trim();
+    const email = formData.email.trim();
+    const message = formData.message.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // Client-side validation
+    if (!name) {
+      onShowToast('Please enter your name.');
+      return;
+    }
+
+    if (!email || !emailRegex.test(email)) {
+      onShowToast('Please enter a valid email address.');
+      return;
+    }
+
+    if (!message) {
+      onShowToast('Please enter your message.');
       return;
     }
 
     setIsSubmitting(true);
 
-    // Simulate sending message
-    setTimeout(() => {
+    try {
+      // Send the form data to the Express backend API
+      const response = await fetch('http://localhost:5000/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          subject: formData.subject.trim(),
+          message
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSubmitted(true);
+        onShowToast(data.message || 'Message received successfully!');
+        setFormData({ name: '', email: '', subject: '', message: '' });
+      } else {
+        // Server returned an error (e.g., 400 Bad Request)
+        onShowToast(data.message || 'Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Submission error:', error);
+      // Network failure or backend not running
+      onShowToast('Server is unreachable. Please ensure the backend server is running.');
+    } finally {
       setIsSubmitting(false);
-      setSubmitted(true);
-      onShowToast('Message received! Thank you for reaching out.');
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 800);
+    }
   };
 
   const handleCopyEmail = () => {
